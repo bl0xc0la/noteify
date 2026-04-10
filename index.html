@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Control Dashboard</title>
+  <title>AI Chat System</title>
   <style>
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       color: white;
     }
@@ -19,23 +19,21 @@
 
     .box {
       background: rgba(255,255,255,0.05);
-      backdrop-filter: blur(10px);
       padding: 25px;
       border-radius: 16px;
       width: 320px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     }
 
-    input, button, textarea {
+    input, button {
       width: 100%;
       padding: 12px;
       margin-top: 10px;
       border: none;
       border-radius: 10px;
-      outline: none;
     }
 
-    input, textarea {
+    input {
       background: rgba(255,255,255,0.1);
       color: white;
     }
@@ -43,26 +41,21 @@
     button {
       background: linear-gradient(135deg, #00c6ff, #0072ff);
       color: white;
-      font-weight: bold;
       cursor: pointer;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-      transition: 0.2s;
     }
-
-    button:hover { transform: scale(1.05); }
 
     .app { display: none; height: 100vh; }
 
-    .split { display: flex; height: 100%; }
-
-    .chat, .control {
-      flex: 1;
+    .chat {
       padding: 20px;
-      overflow-y: auto;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
     }
 
-    .chat {
-      border-right: 2px solid rgba(255,255,255,0.1);
+    #chat {
+      flex: 1;
+      overflow-y: auto;
     }
 
     .msg {
@@ -80,31 +73,19 @@
       background: linear-gradient(135deg, #2ecc71, #27ae60);
     }
 
-    .pending {
-      background: rgba(255,255,255,0.05);
-      padding: 12px;
-      margin: 10px 0;
-      border-radius: 12px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-    }
-
     #toast {
       position: fixed;
       top: 20px;
       right: 20px;
-      background: linear-gradient(135deg, #ff416c, #ff4b2b);
-      padding: 12px 16px;
+      background: #ff416c;
+      padding: 10px;
       border-radius: 10px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.5);
       opacity: 0;
-      transform: translateY(-20px);
       transition: 0.3s;
-      font-weight: bold;
     }
 
     #toast.show {
       opacity: 1;
-      transform: translateY(0);
     }
   </style>
 </head>
@@ -122,21 +103,12 @@
 
 <!-- APP -->
 <div id="app" class="app">
-  <div class="split">
-
-    <div class="chat">
-      <h2>Chat</h2>
-      <div id="chat"></div>
-      <input id="input" placeholder="Type message...">
-      <button onclick="send()">Send</button>
-      <button onclick="logout()">Logout</button>
-    </div>
-
-    <div class="control">
-      <h2>AI Control Panel</h2>
-      <div id="pendingList"></div>
-    </div>
-
+  <div class="chat">
+    <h2>AI Chat</h2>
+    <div id="chat"></div>
+    <input id="input" placeholder="Type message or /ai">
+    <button onclick="send()">Send</button>
+    <button onclick="logout()">Logout</button>
   </div>
 </div>
 
@@ -149,29 +121,17 @@ const PASSWORD = "Ilikechips!1";
 
 // --- STATE ---
 let chatData = JSON.parse(localStorage.getItem("chat") || "[]");
-let pending = JSON.parse(localStorage.getItem("pending") || "[]");
-let mode = "control";
+let mode = "normal";
 
-// --- SOUND ---
-const sounds = {
-  send: new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"),
-  approve: new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg"),
-  reject: new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"),
-  notify: new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg")
-};
-
-function playSound(type) {
-  if (sounds[type]) {
-    sounds[type].currentTime = 0;
-    sounds[type].play();
-  }
-}
+// --- SOUNDS ---
+const sendSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+const aiSound = new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg");
 
 // --- TOAST ---
 function showToast(text) {
   toast.innerText = text;
   toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2500);
+  setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
 // --- LOGIN ---
@@ -192,7 +152,6 @@ function logout() {
 window.onload = () => {
   if (localStorage.getItem("session")) showApp();
   renderChat();
-  updatePending();
 };
 
 function showApp() {
@@ -215,39 +174,12 @@ function renderChat() {
     div.innerText = m.text;
     chat.appendChild(div);
   });
+  chat.scrollTop = chat.scrollHeight;
 }
 
 // --- AI ---
 function AI(input) {
-  return "[AI OUTPUT]: " + input;
-}
-
-// --- COMMANDS ---
-function handleCommand(cmd) {
-  if (cmd === "/ai") {
-    mode = "ai";
-    showToast("AI mode enabled");
-    return;
-  }
-
-  if (cmd === "/control") {
-    mode = "control";
-    showToast("Control mode enabled");
-    return;
-  }
-
-  if (cmd.startsWith("/say ")) {
-    addMessage(cmd.replace("/say ", ""), "ai");
-    playSound("approve");
-    return;
-  }
-
-  if (cmd === "/clear") {
-    chatData = [];
-    localStorage.removeItem("chat");
-    renderChat();
-    showToast("Chat cleared");
-  }
+  return "AI: " + input;
 }
 
 // --- SEND ---
@@ -255,77 +187,38 @@ function send() {
   let text = input.value;
   if (!text) return;
 
-  if (text.startsWith("/")) {
-    handleCommand(text);
+  // Commands
+  if (text === "/ai") {
+    mode = "ai";
+    showToast("You are now AI");
     input.value = "";
     return;
   }
 
-  if (mode === "ai") {
-    addMessage(text, "ai");
-    playSound("approve");
+  if (text === "/user") {
+    mode = "normal";
+    showToast("Back to user mode");
     input.value = "";
     return;
   }
 
-  addMessage(text, "user");
-  playSound("send");
+  // USER MESSAGE
+  if (mode === "normal") {
+    addMessage(text, "user");
+    sendSound.play();
 
-  let item = {
-    id: Date.now(),
-    content: AI(text)
-  };
+    let reply = AI(text);
+    addMessage(reply, "ai");
+    aiSound.play();
+  }
 
-  pending.push(item);
-  savePending();
-  updatePending();
-
-  showToast("AI needs approval");
-  playSound("notify");
+  // YOU ARE AI MODE
+  else if (mode === "ai") {
+    addMessage("AI: " + text, "ai");
+    aiSound.play();
+  }
 
   input.value = "";
-}
-
-// --- CONTROL PANEL ---
-function updatePending() {
-  pendingList.innerHTML = "";
-
-  pending.forEach(item => {
-    let div = document.createElement("div");
-    div.className = "pending";
-
-    let textarea = document.createElement("textarea");
-    textarea.value = item.content;
-
-    let approve = document.createElement("button");
-    approve.innerText = "Approve";
-    approve.onclick = () => {
-      addMessage(textarea.value, "ai");
-      pending = pending.filter(p => p.id !== item.id);
-      savePending();
-      updatePending();
-      playSound("approve");
-    };
-
-    let reject = document.createElement("button");
-    reject.innerText = "Reject";
-    reject.onclick = () => {
-      pending = pending.filter(p => p.id !== item.id);
-      savePending();
-      updatePending();
-      playSound("reject");
-    };
-
-    div.appendChild(textarea);
-    div.appendChild(approve);
-    div.appendChild(reject);
-
-    pendingList.appendChild(div);
-  });
-}
-
-function savePending() {
-  localStorage.setItem("pending", JSON.stringify(pending));
 }
 </script>
 
