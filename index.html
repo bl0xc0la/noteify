@@ -104,9 +104,9 @@
 <!-- APP -->
 <div id="app" class="app">
   <div class="chat">
-    <h2>AI Chat</h2>
+    <h2 id="welcome"></h2>
     <div id="chat"></div>
-    <input id="input" placeholder="Type message or /ai">
+    <input id="input" placeholder="Type message">
     <button onclick="send()">Send</button>
     <button onclick="logout()">Logout</button>
   </div>
@@ -115,13 +115,10 @@
 <div id="toast"></div>
 
 <script>
-// --- CONFIG ---
-const USERNAME = "BloxColaYT";
-const PASSWORD = "Ilikechips!1";
-
 // --- STATE ---
-let chatData = JSON.parse(localStorage.getItem("chat") || "[]");
-let mode = "normal";
+let currentUser = null;
+let users = JSON.parse(localStorage.getItem("users") || "{}");
+let chatData = [];
 
 // --- SOUNDS ---
 const sendSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
@@ -134,14 +131,62 @@ function showToast(text) {
   setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
-// --- LOGIN ---
+// --- LOGIN SYSTEM ---
 function login() {
-  if (username.value === USERNAME && password.value === PASSWORD) {
-    localStorage.setItem("session", "true");
-    showApp();
+  let u = username.value.trim();
+  let p = password.value;
+
+  if (!u || !p) return showToast("Enter details");
+
+  // If user exists → check password
+  if (users[u]) {
+    if (users[u].password !== p) {
+      return showToast("Wrong password");
+    }
   } else {
-    showToast("Wrong login");
+    // Auto create account
+    users[u] = {
+      password: p,
+      chat: []
+    };
+    showToast("Account created");
   }
+
+  currentUser = u;
+  localStorage.setItem("users", JSON.stringify(users));
+  localStorage.setItem("session", u);
+
+  loadUser();
+  showApp();
+}
+
+// --- SESSION ---
+window.onload = () => {
+  let session = localStorage.getItem("session");
+  if (session && users[session]) {
+    currentUser = session;
+    loadUser();
+    showApp();
+  }
+};
+
+// --- LOAD USER ---
+function loadUser() {
+  chatData = users[currentUser].chat || [];
+  welcome.innerText = "Logged in as " + currentUser;
+  renderChat();
+}
+
+// --- SAVE ---
+function save() {
+  users[currentUser].chat = chatData;
+  localStorage.setItem("users", JSON.stringify(users));
+}
+
+// --- UI ---
+function showApp() {
+  loginScreen.style.display = "none";
+  app.style.display = "block";
 }
 
 function logout() {
@@ -149,20 +194,10 @@ function logout() {
   location.reload();
 }
 
-window.onload = () => {
-  if (localStorage.getItem("session")) showApp();
-  renderChat();
-};
-
-function showApp() {
-  loginScreen.style.display = "none";
-  app.style.display = "block";
-}
-
 // --- CHAT ---
 function addMessage(text, type) {
   chatData.push({ text, type });
-  localStorage.setItem("chat", JSON.stringify(chatData));
+  save();
   renderChat();
 }
 
@@ -187,36 +222,12 @@ function send() {
   let text = input.value;
   if (!text) return;
 
-  // Commands
-  if (text === "/ai") {
-    mode = "ai";
-    showToast("You are now AI");
-    input.value = "";
-    return;
-  }
+  addMessage(text, "user");
+  sendSound.play();
 
-  if (text === "/user") {
-    mode = "normal";
-    showToast("Back to user mode");
-    input.value = "";
-    return;
-  }
-
-  // USER MESSAGE
-  if (mode === "normal") {
-    addMessage(text, "user");
-    sendSound.play();
-
-    let reply = AI(text);
-    addMessage(reply, "ai");
-    aiSound.play();
-  }
-
-  // YOU ARE AI MODE
-  else if (mode === "ai") {
-    addMessage("AI: " + text, "ai");
-    aiSound.play();
-  }
+  let reply = AI(text);
+  addMessage(reply, "ai");
+  aiSound.play();
 
   input.value = "";
 }
