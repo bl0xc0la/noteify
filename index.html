@@ -5,8 +5,8 @@
   <style>
     body {
       margin: 0;
-      font-family: Arial;
-      background: #0f0f0f;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       color: white;
     }
 
@@ -18,21 +18,40 @@
     }
 
     .box {
-      background: #1a1a1a;
-      padding: 20px;
-      border-radius: 12px;
-      width: 300px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      padding: 25px;
+      border-radius: 16px;
+      width: 320px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     }
 
     input, button, textarea {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       margin-top: 10px;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
+      outline: none;
     }
 
-    button { cursor: pointer; }
+    input {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+      transition: 0.2s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
 
     .app {
       display: none;
@@ -50,22 +69,36 @@
       overflow-y: auto;
     }
 
-    .chat { border-right: 2px solid #222; }
+    .chat {
+      border-right: 2px solid rgba(255,255,255,0.1);
+    }
 
     .msg {
       margin: 10px 0;
-      padding: 10px;
-      border-radius: 10px;
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.4);
     }
 
-    .user { background: #1e90ff; }
-    .ai { background: #2ecc71; }
+    .user {
+      background: linear-gradient(135deg, #1e90ff, #0066ff);
+    }
+
+    .ai {
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
 
     .pending {
-      background: #222;
-      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      padding: 12px;
       margin: 10px 0;
-      border-radius: 10px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+
+    textarea {
+      background: rgba(255,255,255,0.1);
+      color: white;
     }
   </style>
 </head>
@@ -78,7 +111,6 @@
     <input id="username" placeholder="Username">
     <input id="password" type="password" placeholder="Password">
     <button onclick="login()">Login</button>
-    <button onclick="register()">Register</button>
   </div>
 </div>
 
@@ -103,49 +135,20 @@
 </div>
 
 <script>
-let currentUser = null;
-let chatData = [];
-let pending = [];
+const USERNAME = "BloxColaYT";
+const PASSWORD = "Ilikechips!1";
 
-// --- AUTH SYSTEM ---
+let chatData = JSON.parse(localStorage.getItem("chat") || "[]");
+let pending = JSON.parse(localStorage.getItem("pending") || "[]");
 
-function getUsers() {
-  return JSON.parse(localStorage.getItem("users") || "{}");
-}
-
-function saveUsers(users) {
-  localStorage.setItem("users", JSON.stringify(users));
-}
-
-function register() {
-  let u = username.value;
-  let p = password.value;
-
-  let users = getUsers();
-
-  if (users[u]) return alert("User exists");
-
-  users[u] = { password: p, chat: [], pending: [] };
-  saveUsers(users);
-
-  alert("Registered!");
-}
-
+// --- LOGIN ---
 function login() {
-  let u = username.value;
-  let p = password.value;
-
-  let users = getUsers();
-
-  if (!users[u] || users[u].password !== p) {
-    return alert("Invalid login");
+  if (username.value === USERNAME && password.value === PASSWORD) {
+    localStorage.setItem("session", "true");
+    showApp();
+  } else {
+    alert("Wrong login");
   }
-
-  currentUser = u;
-  localStorage.setItem("session", u);
-
-  loadUserData();
-  showApp();
 }
 
 function logout() {
@@ -153,45 +156,25 @@ function logout() {
   location.reload();
 }
 
-// --- SESSION AUTO LOGIN ---
+// Auto login
 window.onload = () => {
-  let session = localStorage.getItem("session");
-  if (session) {
-    currentUser = session;
-    loadUserData();
+  if (localStorage.getItem("session")) {
     showApp();
   }
-};
-
-// --- DATA LOAD/SAVE ---
-
-function loadUserData() {
-  let users = getUsers();
-  chatData = users[currentUser].chat || [];
-  pending = users[currentUser].pending || [];
-
   renderChat();
   updatePending();
-}
-
-function saveUserData() {
-  let users = getUsers();
-  users[currentUser].chat = chatData;
-  users[currentUser].pending = pending;
-  saveUsers(users);
-}
-
-// --- UI ---
+};
 
 function showApp() {
   loginScreen.style.display = "none";
   app.style.display = "block";
 }
 
+// --- CHAT ---
 function addMessage(text, type) {
   chatData.push({ text, type });
+  localStorage.setItem("chat", JSON.stringify(chatData));
   renderChat();
-  saveUserData();
 }
 
 function renderChat() {
@@ -204,33 +187,30 @@ function renderChat() {
   });
 }
 
-// --- AI (fake for now) ---
+// --- AI ---
 function AI(input) {
   return "AI thinks: " + input;
 }
 
-// --- CHAT FLOW ---
 function send() {
   let text = input.value;
   if (!text) return;
 
   addMessage(text, "user");
 
-  let aiResponse = AI(text);
-
   let item = {
     id: Date.now(),
-    content: aiResponse
+    content: AI(text)
   };
 
   pending.push(item);
-  updatePending();
-  saveUserData();
+  localStorage.setItem("pending", JSON.stringify(pending));
 
+  updatePending();
   input.value = "";
 }
 
-// --- CONTROL PANEL ---
+// --- CONTROL ---
 function updatePending() {
   pendingList.innerHTML = "";
 
@@ -246,16 +226,16 @@ function updatePending() {
     approve.onclick = () => {
       addMessage(textarea.value, "ai");
       pending = pending.filter(p => p.id !== item.id);
+      savePending();
       updatePending();
-      saveUserData();
     };
 
     let reject = document.createElement("button");
     reject.innerText = "Reject";
     reject.onclick = () => {
       pending = pending.filter(p => p.id !== item.id);
+      savePending();
       updatePending();
-      saveUserData();
     };
 
     div.appendChild(textarea);
@@ -264,6 +244,10 @@ function updatePending() {
 
     pendingList.appendChild(div);
   });
+}
+
+function savePending() {
+  localStorage.setItem("pending", JSON.stringify(pending));
 }
 </script>
 
