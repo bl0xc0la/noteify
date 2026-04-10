@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Chat System</title>
+  <title>AI System</title>
   <style>
     body {
       margin: 0;
@@ -63,10 +63,8 @@
       padding: 12px;
       border-radius: 12px;
       box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
     }
-
-    .user { background: linear-gradient(135deg, #1e90ff, #0066ff); }
-    .ai { background: linear-gradient(135deg, #2ecc71, #27ae60); }
 
     #toast {
       position: fixed;
@@ -87,10 +85,10 @@
 <!-- LOGIN -->
 <div id="loginScreen" class="center">
   <div class="box">
-    <h2>Login</h2>
+    <h2>AI Login</h2>
     <input id="username" placeholder="Username">
     <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
+    <button onclick="login()">Enter</button>
   </div>
 </div>
 
@@ -99,7 +97,7 @@
   <div class="chat">
     <h2 id="welcome"></h2>
     <div id="chat"></div>
-    <input id="input" placeholder="Type message or /ai">
+    <input id="input" placeholder="Speak as AI...">
     <button onclick="send()">Send</button>
     <button onclick="logout()">Logout</button>
   </div>
@@ -108,15 +106,10 @@
 <div id="toast"></div>
 
 <script>
-// --- STATE ---
-let currentUser = null;
+// --- DATA ---
 let users = JSON.parse(localStorage.getItem("users") || "{}");
+let currentUser = null;
 let chatData = [];
-let mode = "user";
-
-// --- SOUNDS ---
-const sendSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
-const aiSound = new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg");
 
 // --- TOAST ---
 function showToast(text) {
@@ -125,7 +118,7 @@ function showToast(text) {
   setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
-// --- LOGIN ---
+// --- LOGIN (AUTO CREATE) ---
 function login() {
   let u = username.value.trim();
   let p = password.value;
@@ -138,7 +131,7 @@ function login() {
     }
   } else {
     users[u] = { password: p, chat: [] };
-    showToast("Account created");
+    showToast("New user created (new tab ready)");
   }
 
   currentUser = u;
@@ -162,7 +155,7 @@ window.onload = () => {
 // --- LOAD USER ---
 function loadUser() {
   chatData = users[currentUser].chat || [];
-  welcome.innerText = "Logged in as " + currentUser;
+  welcome.innerText = "AI Session: " + currentUser;
   renderChat();
 }
 
@@ -183,69 +176,51 @@ function logout() {
   location.reload();
 }
 
-// --- CHAT ---
-function addMessage(author, text, type) {
-  chatData.push({ author, text, type });
-  save();
-
-  // Render ONLY the new message (fixes duplication feeling)
-  let div = document.createElement("div");
-  div.className = "msg " + type;
-  div.innerText = author + ": " + text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
-
+// --- RENDER ---
 function renderChat() {
   chat.innerHTML = "";
   chatData.forEach(m => {
-    let div = document.createElement("div");
-    div.className = "msg " + m.type;
-    div.innerText = m.author + ": " + m.text;
-    chat.appendChild(div);
+    createMessage(m.text);
   });
 }
 
-// --- AI ---
-function AI(input) {
-  return input; // no weird repeating logic
+// --- TYPING EFFECT ---
+function typeMessage(text, element) {
+  let i = 0;
+  element.innerText = "AI: ";
+
+  let interval = setInterval(() => {
+    element.innerText += text[i];
+    i++;
+
+    if (i >= text.length) {
+      clearInterval(interval);
+    }
+  }, 25); // speed
 }
 
-// --- SEND ---
+// --- CREATE MESSAGE ---
+function createMessage(text) {
+  let div = document.createElement("div");
+  div.className = "msg";
+
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+
+  typeMessage(text, div);
+}
+
+// --- SEND (YOU ARE ALWAYS AI) ---
 function send() {
   let text = input.value.trim();
   if (!text) return;
 
-  // COMMANDS
-  if (text === "/ai") {
-    mode = "ai";
-    showToast("You are now AI");
-    input.value = "";
-    return;
-  }
+  // Save
+  chatData.push({ text });
+  save();
 
-  if (text === "/user") {
-    mode = "user";
-    showToast("Back to user mode");
-    input.value = "";
-    return;
-  }
-
-  // USER MODE
-  if (mode === "user") {
-    addMessage(currentUser, text, "user");
-    sendSound.play();
-
-    let reply = AI(text);
-    addMessage("AI", reply, "ai");
-    aiSound.play();
-  }
-
-  // AI MODE (you are AI)
-  else if (mode === "ai") {
-    addMessage("AI", text, "ai");
-    aiSound.play();
-  }
+  // Display with typing effect
+  createMessage(text);
 
   input.value = "";
 }
