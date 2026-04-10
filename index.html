@@ -65,13 +65,8 @@
       box-shadow: 0 5px 15px rgba(0,0,0,0.4);
     }
 
-    .user {
-      background: linear-gradient(135deg, #1e90ff, #0066ff);
-    }
-
-    .ai {
-      background: linear-gradient(135deg, #2ecc71, #27ae60);
-    }
+    .user { background: linear-gradient(135deg, #1e90ff, #0066ff); }
+    .ai { background: linear-gradient(135deg, #2ecc71, #27ae60); }
 
     #toast {
       position: fixed;
@@ -84,9 +79,7 @@
       transition: 0.3s;
     }
 
-    #toast.show {
-      opacity: 1;
-    }
+    #toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -106,7 +99,7 @@
   <div class="chat">
     <h2 id="welcome"></h2>
     <div id="chat"></div>
-    <input id="input" placeholder="Type message">
+    <input id="input" placeholder="Type message or /ai">
     <button onclick="send()">Send</button>
     <button onclick="logout()">Logout</button>
   </div>
@@ -119,6 +112,7 @@
 let currentUser = null;
 let users = JSON.parse(localStorage.getItem("users") || "{}");
 let chatData = [];
+let mode = "user";
 
 // --- SOUNDS ---
 const sendSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
@@ -131,24 +125,19 @@ function showToast(text) {
   setTimeout(() => toast.classList.remove("show"), 2000);
 }
 
-// --- LOGIN SYSTEM ---
+// --- LOGIN ---
 function login() {
   let u = username.value.trim();
   let p = password.value;
 
   if (!u || !p) return showToast("Enter details");
 
-  // If user exists → check password
   if (users[u]) {
     if (users[u].password !== p) {
       return showToast("Wrong password");
     }
   } else {
-    // Auto create account
-    users[u] = {
-      password: p,
-      chat: []
-    };
+    users[u] = { password: p, chat: [] };
     showToast("Account created");
   }
 
@@ -195,10 +184,16 @@ function logout() {
 }
 
 // --- CHAT ---
-function addMessage(text, type) {
-  chatData.push({ text, type });
+function addMessage(author, text, type) {
+  chatData.push({ author, text, type });
   save();
-  renderChat();
+
+  // Render ONLY the new message (fixes duplication feeling)
+  let div = document.createElement("div");
+  div.className = "msg " + type;
+  div.innerText = author + ": " + text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 function renderChat() {
@@ -206,28 +201,51 @@ function renderChat() {
   chatData.forEach(m => {
     let div = document.createElement("div");
     div.className = "msg " + m.type;
-    div.innerText = m.text;
+    div.innerText = m.author + ": " + m.text;
     chat.appendChild(div);
   });
-  chat.scrollTop = chat.scrollHeight;
 }
 
 // --- AI ---
 function AI(input) {
-  return "AI: " + input;
+  return input; // no weird repeating logic
 }
 
 // --- SEND ---
 function send() {
-  let text = input.value;
+  let text = input.value.trim();
   if (!text) return;
 
-  addMessage(text, "user");
-  sendSound.play();
+  // COMMANDS
+  if (text === "/ai") {
+    mode = "ai";
+    showToast("You are now AI");
+    input.value = "";
+    return;
+  }
 
-  let reply = AI(text);
-  addMessage(reply, "ai");
-  aiSound.play();
+  if (text === "/user") {
+    mode = "user";
+    showToast("Back to user mode");
+    input.value = "";
+    return;
+  }
+
+  // USER MODE
+  if (mode === "user") {
+    addMessage(currentUser, text, "user");
+    sendSound.play();
+
+    let reply = AI(text);
+    addMessage("AI", reply, "ai");
+    aiSound.play();
+  }
+
+  // AI MODE (you are AI)
+  else if (mode === "ai") {
+    addMessage("AI", text, "ai");
+    aiSound.play();
+  }
 
   input.value = "";
 }
