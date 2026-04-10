@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Controlled AI System</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #0f0f0f;
+      color: white;
+    }
+
+    .center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .box {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 12px;
+      width: 300px;
+    }
+
+    input, button, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 8px;
+    }
+
+    button { cursor: pointer; }
+
+    .app {
+      display: none;
+      height: 100vh;
+    }
+
+    .split {
+      display: flex;
+      height: 100%;
+    }
+
+    .chat, .control {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .chat { border-right: 2px solid #222; }
+
+    .msg {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .user { background: #1e90ff; }
+    .ai { background: #2ecc71; }
+
+    .pending {
+      background: #222;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="center">
+  <div class="box">
+    <h2>Login</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app">
+  <div class="split">
+
+    <div class="chat">
+      <h2>Chat</h2>
+      <div id="chat"></div>
+      <input id="input" placeholder="Type message...">
+      <button onclick="send()">Send</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div class="control">
+      <h2>AI Control Panel</h2>
+      <div id="pendingList"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+let chatData = [];
+let pending = [];
+
+// --- AUTH SYSTEM ---
+
+function getUsers() {
+  return JSON.parse(localStorage.getItem("users") || "{}");
+}
+
+function saveUsers(users) {
+  localStorage.setItem("users", JSON.stringify(users));
+}
+
+function register() {
+  let u = username.value;
+  let p = password.value;
+
+  let users = getUsers();
+
+  if (users[u]) return alert("User exists");
+
+  users[u] = { password: p, chat: [], pending: [] };
+  saveUsers(users);
+
+  alert("Registered!");
+}
+
+function login() {
+  let u = username.value;
+  let p = password.value;
+
+  let users = getUsers();
+
+  if (!users[u] || users[u].password !== p) {
+    return alert("Invalid login");
+  }
+
+  currentUser = u;
+  localStorage.setItem("session", u);
+
+  loadUserData();
+  showApp();
+}
+
+function logout() {
+  localStorage.removeItem("session");
+  location.reload();
+}
+
+// --- SESSION AUTO LOGIN ---
+window.onload = () => {
+  let session = localStorage.getItem("session");
+  if (session) {
+    currentUser = session;
+    loadUserData();
+    showApp();
+  }
+};
+
+// --- DATA LOAD/SAVE ---
+
+function loadUserData() {
+  let users = getUsers();
+  chatData = users[currentUser].chat || [];
+  pending = users[currentUser].pending || [];
+
+  renderChat();
+  updatePending();
+}
+
+function saveUserData() {
+  let users = getUsers();
+  users[currentUser].chat = chatData;
+  users[currentUser].pending = pending;
+  saveUsers(users);
+}
+
+// --- UI ---
+
+function showApp() {
+  loginScreen.style.display = "none";
+  app.style.display = "block";
+}
+
+function addMessage(text, type) {
+  chatData.push({ text, type });
+  renderChat();
+  saveUserData();
+}
+
+function renderChat() {
+  chat.innerHTML = "";
+  chatData.forEach(m => {
+    let div = document.createElement("div");
+    div.className = "msg " + m.type;
+    div.innerText = m.text;
+    chat.appendChild(div);
+  });
+}
+
+// --- AI (fake for now) ---
+function AI(input) {
+  return "AI thinks: " + input;
+}
+
+// --- CHAT FLOW ---
+function send() {
+  let text = input.value;
+  if (!text) return;
+
+  addMessage(text, "user");
+
+  let aiResponse = AI(text);
+
+  let item = {
+    id: Date.now(),
+    content: aiResponse
+  };
+
+  pending.push(item);
+  updatePending();
+  saveUserData();
+
+  input.value = "";
+}
+
+// --- CONTROL PANEL ---
+function updatePending() {
+  pendingList.innerHTML = "";
+
+  pending.forEach(item => {
+    let div = document.createElement("div");
+    div.className = "pending";
+
+    let textarea = document.createElement("textarea");
+    textarea.value = item.content;
+
+    let approve = document.createElement("button");
+    approve.innerText = "Approve";
+    approve.onclick = () => {
+      addMessage(textarea.value, "ai");
+      pending = pending.filter(p => p.id !== item.id);
+      updatePending();
+      saveUserData();
+    };
+
+    let reject = document.createElement("button");
+    reject.innerText = "Reject";
+    reject.onclick = () => {
+      pending = pending.filter(p => p.id !== item.id);
+      updatePending();
+      saveUserData();
+    };
+
+    div.appendChild(textarea);
+    div.appendChild(approve);
+    div.appendChild(reject);
+
+    pendingList.appendChild(div);
+  });
+}
+</script>
+
+</body>
+</html>
