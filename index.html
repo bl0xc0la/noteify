@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Multi-System</title>
+  <title>AI System</title>
   <style>
     body {
       margin: 0;
@@ -9,6 +9,42 @@
       background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
       color: white;
     }
+
+    .center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .box {
+      background: rgba(255,255,255,0.05);
+      padding: 25px;
+      border-radius: 16px;
+      width: 320px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 10px;
+    }
+
+    input {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+      color: white;
+      cursor: pointer;
+    }
+
+    .app { display: none; }
 
     .topbar {
       display: flex;
@@ -40,7 +76,7 @@
 
     .chat {
       padding: 20px;
-      height: calc(100vh - 70px);
+      height: calc(100vh - 120px);
       display: flex;
       flex-direction: column;
     }
@@ -57,7 +93,6 @@
       background: linear-gradient(135deg, #2ecc71, #27ae60);
       display: flex;
       gap: 10px;
-      align-items: flex-start;
     }
 
     .msg img {
@@ -65,51 +100,89 @@
       height: 32px;
       border-radius: 50%;
     }
-
-    input, button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      border: none;
-      border-radius: 10px;
-    }
-
-    input {
-      background: rgba(255,255,255,0.1);
-      color: white;
-    }
-
-    button {
-      background: linear-gradient(135deg, #00c6ff, #0072ff);
-      color: white;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
 
-<div class="topbar" id="tabs"></div>
+<!-- LOGIN -->
+<div id="loginScreen" class="center">
+  <div class="box">
+    <h2>Login</h2>
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Enter</button>
+  </div>
+</div>
 
-<div class="chat">
-  <div id="chat"></div>
-  <input id="input" placeholder="Speak as AI...">
-  <button onclick="send()">Send</button>
-  <button onclick="newAI()">+ New AI</button>
+<!-- APP -->
+<div id="app" class="app">
+  <div class="topbar" id="tabs"></div>
+
+  <div class="chat">
+    <div id="chat"></div>
+    <input id="input" placeholder="Speak as AI...">
+    <button onclick="send()">Send</button>
+    <button onclick="newAI()">+ New AI</button>
+    <button onclick="startConversation()">Make them talk</button>
+    <button onclick="logout()">Logout</button>
+  </div>
 </div>
 
 <script>
-// --- DATA ---
+// --- LOGIN SYSTEM ---
+let accounts = JSON.parse(localStorage.getItem("accounts") || "{}");
+let session = null;
+
+function login() {
+  let u = username.value.trim();
+  let p = password.value;
+
+  if (!u || !p) return alert("Enter details");
+
+  if (accounts[u]) {
+    if (accounts[u].password !== p) return alert("Wrong password");
+  } else {
+    accounts[u] = { password: p };
+  }
+
+  session = u;
+  localStorage.setItem("accounts", JSON.stringify(accounts));
+  localStorage.setItem("session", u);
+
+  showApp();
+}
+
+// --- SESSION ---
+window.onload = () => {
+  let s = localStorage.getItem("session");
+  if (s && accounts[s]) {
+    session = s;
+    showApp();
+  }
+};
+
+function logout() {
+  localStorage.removeItem("session");
+  location.reload();
+}
+
+// --- SHOW APP ---
+function showApp() {
+  loginScreen.style.display = "none";
+  app.style.display = "block";
+  initAI();
+}
+
+// --- AI SYSTEM ---
 let users = JSON.parse(localStorage.getItem("ai_users") || "{}");
 let current = null;
 
-// --- AVATAR GENERATOR ---
 function getAvatar(name) {
   return "https://api.dicebear.com/7.x/bottts/svg?seed=" + name;
 }
 
-// --- CREATE NEW AI ---
 function newAI() {
-  let name = prompt("Enter AI name:");
+  let name = prompt("AI name:");
   if (!name) return;
 
   if (!users[name]) {
@@ -120,14 +193,12 @@ function newAI() {
   }
 }
 
-// --- SWITCH AI ---
 function switchAI(name) {
   current = name;
   renderChat();
   loadTabs();
 }
 
-// --- SAVE ---
 function save() {
   localStorage.setItem("ai_users", JSON.stringify(users));
 }
@@ -135,7 +206,6 @@ function save() {
 // --- TABS ---
 function loadTabs() {
   tabs.innerHTML = "";
-
   Object.keys(users).forEach(name => {
     let div = document.createElement("div");
     div.className = "tab " + (name === current ? "active" : "");
@@ -149,7 +219,6 @@ function loadTabs() {
 
     div.appendChild(img);
     div.appendChild(span);
-
     div.onclick = () => switchAI(name);
 
     tabs.appendChild(div);
@@ -161,32 +230,31 @@ function renderChat() {
   chat.innerHTML = "";
   if (!current) return;
 
-  users[current].chat.forEach(msg => {
-    createMessage(msg);
-  });
+  users[current].chat.forEach(msg => createMessage(current, msg));
 }
 
-function createMessage(text) {
+function createMessage(name, text) {
   let div = document.createElement("div");
   div.className = "msg";
 
   let img = document.createElement("img");
-  img.src = getAvatar(current);
+  img.src = getAvatar(name);
 
   let content = document.createElement("div");
+
   div.appendChild(img);
   div.appendChild(content);
 
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 
-  typeEffect(text, content);
+  typeEffect(name + ": " + text, content);
 }
 
-// --- TYPING EFFECT ---
+// --- TYPING ---
 function typeEffect(text, el) {
   let i = 0;
-  el.innerText = current + ": ";
+  el.innerText = "";
 
   let interval = setInterval(() => {
     el.innerText += text[i];
@@ -202,14 +270,48 @@ function send() {
 
   users[current].chat.push(text);
   save();
-
-  createMessage(text);
+  createMessage(current, text);
 
   input.value = "";
 }
 
+// --- AI TALK SYSTEM ---
+function startConversation() {
+  let names = Object.keys(users);
+  if (names.length < 2) return alert("Need 2 AIs");
+
+  let i = 0;
+
+  let interval = setInterval(() => {
+    let speaker = names[i % names.length];
+    let msg = generateAIMessage();
+
+    users[speaker].chat.push(msg);
+    save();
+
+    if (speaker === current) {
+      createMessage(speaker, msg);
+    }
+
+    i++;
+  }, 1500);
+}
+
+// --- SIMPLE AI LOGIC ---
+function generateAIMessage() {
+  const msgs = [
+    "Hello there",
+    "Interesting thought",
+    "I agree",
+    "That is fascinating",
+    "Tell me more",
+    "Processing idea..."
+  ];
+  return msgs[Math.floor(Math.random() * msgs.length)];
+}
+
 // --- INIT ---
-window.onload = () => {
+function initAI() {
   if (Object.keys(users).length === 0) {
     users["AI-1"] = { chat: [] };
   }
@@ -217,7 +319,7 @@ window.onload = () => {
   current = Object.keys(users)[0];
   loadTabs();
   renderChat();
-};
+}
 </script>
 
 </body>
