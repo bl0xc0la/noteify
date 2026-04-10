@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Controlled AI System</title>
+  <title>AI Control Dashboard</title>
   <style>
     body {
       margin: 0;
@@ -35,7 +35,7 @@
       outline: none;
     }
 
-    input {
+    input, textarea {
       background: rgba(255,255,255,0.1);
       color: white;
     }
@@ -49,19 +49,11 @@
       transition: 0.2s;
     }
 
-    button:hover {
-      transform: scale(1.05);
-    }
+    button:hover { transform: scale(1.05); }
 
-    .app {
-      display: none;
-      height: 100vh;
-    }
+    .app { display: none; height: 100vh; }
 
-    .split {
-      display: flex;
-      height: 100%;
-    }
+    .split { display: flex; height: 100%; }
 
     .chat, .control {
       flex: 1;
@@ -96,9 +88,23 @@
       box-shadow: 0 5px 15px rgba(0,0,0,0.5);
     }
 
-    textarea {
-      background: rgba(255,255,255,0.1);
-      color: white;
+    #toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #ff416c, #ff4b2b);
+      padding: 12px 16px;
+      border-radius: 10px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: 0.3s;
+      font-weight: bold;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
     }
   </style>
 </head>
@@ -134,12 +140,39 @@
   </div>
 </div>
 
+<div id="toast"></div>
+
 <script>
+// --- CONFIG ---
 const USERNAME = "BloxColaYT";
 const PASSWORD = "Ilikechips!1";
 
+// --- STATE ---
 let chatData = JSON.parse(localStorage.getItem("chat") || "[]");
 let pending = JSON.parse(localStorage.getItem("pending") || "[]");
+let mode = "control";
+
+// --- SOUND ---
+const sounds = {
+  send: new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"),
+  approve: new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg"),
+  reject: new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"),
+  notify: new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg")
+};
+
+function playSound(type) {
+  if (sounds[type]) {
+    sounds[type].currentTime = 0;
+    sounds[type].play();
+  }
+}
+
+// --- TOAST ---
+function showToast(text) {
+  toast.innerText = text;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2500);
+}
 
 // --- LOGIN ---
 function login() {
@@ -147,7 +180,7 @@ function login() {
     localStorage.setItem("session", "true");
     showApp();
   } else {
-    alert("Wrong login");
+    showToast("Wrong login");
   }
 }
 
@@ -156,11 +189,8 @@ function logout() {
   location.reload();
 }
 
-// Auto login
 window.onload = () => {
-  if (localStorage.getItem("session")) {
-    showApp();
-  }
+  if (localStorage.getItem("session")) showApp();
   renderChat();
   updatePending();
 };
@@ -189,14 +219,57 @@ function renderChat() {
 
 // --- AI ---
 function AI(input) {
-  return "AI thinks: " + input;
+  return "[AI OUTPUT]: " + input;
 }
 
+// --- COMMANDS ---
+function handleCommand(cmd) {
+  if (cmd === "/ai") {
+    mode = "ai";
+    showToast("AI mode enabled");
+    return;
+  }
+
+  if (cmd === "/control") {
+    mode = "control";
+    showToast("Control mode enabled");
+    return;
+  }
+
+  if (cmd.startsWith("/say ")) {
+    addMessage(cmd.replace("/say ", ""), "ai");
+    playSound("approve");
+    return;
+  }
+
+  if (cmd === "/clear") {
+    chatData = [];
+    localStorage.removeItem("chat");
+    renderChat();
+    showToast("Chat cleared");
+  }
+}
+
+// --- SEND ---
 function send() {
   let text = input.value;
   if (!text) return;
 
+  if (text.startsWith("/")) {
+    handleCommand(text);
+    input.value = "";
+    return;
+  }
+
+  if (mode === "ai") {
+    addMessage(text, "ai");
+    playSound("approve");
+    input.value = "";
+    return;
+  }
+
   addMessage(text, "user");
+  playSound("send");
 
   let item = {
     id: Date.now(),
@@ -204,13 +277,16 @@ function send() {
   };
 
   pending.push(item);
-  localStorage.setItem("pending", JSON.stringify(pending));
-
+  savePending();
   updatePending();
+
+  showToast("AI needs approval");
+  playSound("notify");
+
   input.value = "";
 }
 
-// --- CONTROL ---
+// --- CONTROL PANEL ---
 function updatePending() {
   pendingList.innerHTML = "";
 
@@ -228,6 +304,7 @@ function updatePending() {
       pending = pending.filter(p => p.id !== item.id);
       savePending();
       updatePending();
+      playSound("approve");
     };
 
     let reject = document.createElement("button");
@@ -236,6 +313,7 @@ function updatePending() {
       pending = pending.filter(p => p.id !== item.id);
       savePending();
       updatePending();
+      playSound("reject");
     };
 
     div.appendChild(textarea);
